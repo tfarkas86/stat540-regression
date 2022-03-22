@@ -1,0 +1,220 @@
+---
+title: 'STAT 540: Homework 1'
+author: "Tim Farkas"
+date: "8/25/2019"
+output:
+  pdf_document: default
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, results = "hold")
+```
+
+**1.1.** No, the relationship would no longer be functional. If clerical errors were consistently made in reporting sales, we could then go about describing these "random errors" in a effort to better characterize the relationship between units sold and revenue. We might seeks answers to questions like: What is the magnitude of these errors? Are the errors independent of one another, or does their magnitude depend on something not yet measured, such as cleric identity, or number of units sold? We would end up with a statistical model. 
+
+**1.7.a.** No, we cannot state the exact probability that Y will fall within any values, because we have made too few assumptions about the probability distribution for Y. Many different probability distributions with very different shapes may satisfy the given $\mu$ and $\sigma^2$, hence an infinite number of probabilities would satisfy the conditions. 
+
+**1.7.b** (See Appendix A.1) Yes, the normal error regression model assumes Y has a normal distribution due to normally distributed random error terms. Hence, given $\mu$ and $\sigma^2$, we can calculate exactly the probability Y lies between 195 and 205 as follows:
+
+From probabilty theory: 
+
+$$ \int_{195}^{205} f_Y(y) \; dx = $$
+
+$$\mathrm{P}(195 \le Y \le 205) = P(Y \le 205) - P(Y \le 195)$$
+
+$$ = F_Y(205) - F_Y(195)$$
+
+where $f_Y(y)$ and $F_Y(y)$ are the pdf and cdf of the normal distribution, respectively.
+
+Given the regression function:
+
+$$E(Y) = 100 + 20x$$
+
+For x = 5, 
+
+$$\mu = E(Y) = 100 + 20(5) = 200$$ 
+
+Hence, with normally distributed error:
+
+$$Y \sim N(\mu = 200, \sigma^2 = 4)$$
+
+```{r, echo=FALSE, results=FALSE}
+diff(pnorm(q = c(195, 205), 
+           mean = 200, sd = sqrt(4)))
+```
+
+So, $\mathbf{\mathrm {P}(195 \le Y \le 205) = 0.9875}$
+
+**1.12.a.** These are observational data, since the "experimenter" has not manipulated the data-generating process in order to produce variation for analysis, but instead is relying on natural variation in exercise and illness. 
+
+**1.12.b.** It's a useful study, but the conclusions must be tempered by the fact that causality can be difficult to infer with observational data. It could be that people who get colds decide not to exercise (opposite of causality here inferred), or that an unobserved variable simultaneously influences the likelihood of exercise and catching cold. We should also ask whether the strength of relationship is strong enough, given the sample size, to conclude that anything other than random variations have been observed. 
+
+**1.12.c** 
+
+1. The age of the participant: older (or younger) participants might both be less likely to exercise and more likely to catch cold. 
+2. The weather: colder and/or wetter environmental temperatures are likely to both discourage exercise and increase the likelihood of catching a cold. 
+
+**1.12.d** The best approach, resources permitting, would be to experimentally manipulate the amount of exercise performed by the participants, and to randomly assign exercise levels, so as to control for age and other demographic factors. If an observational study is required, an extensive list of potential confounding factors should be generated, and data on each of them collected and incorporated into analysis (using multiple regression).
+
+**1.19.a** (See Appendix A.2)
+
+```{r, message=FALSE, echo=FALSE, results =FALSE}
+# use tidyverse
+library(tidyverse)
+
+# download data
+dd <- read_table(url(paste("http://users.stat.ufl.edu/~rrandles/sta4210/",
+                           "Rclassnotes/data/textdatasets/KutnerData/", 
+                           "Chapter%20%201%20Data%20Sets/CH01PR19.txt", 
+                           sep="")),
+                 col_names = c("gpa", "act"))
+
+# estimators
+b1 <- function(y, x) {
+  
+  # means
+  xbar <- mean(x)
+  ybar <- mean(y)
+  
+  # b1
+  sum((x - xbar) * (y - ybar)) / sum((x - xbar)^2)
+  
+}
+
+b0 <- function(y, x) {
+  
+  # means
+  xbar <- mean(x)
+  ybar <- mean(y)
+  
+  # b0 
+  ybar - b1(y, x) * xbar
+  
+}
+
+b1(dd$gpa, dd$act) 
+b0(dd$gpa, dd$act)
+
+# check with lm
+lm(formula = gpa ~ act, data=dd)
+```
+
+$$b_1 = \frac{\sum (x_i - \overline{x})(y_i - \overline{y})}{\sum(x_i - \overline{x})^2 } = \mathbf{0.0388}$$
+
+$$b_0 = \overline{y} - b_1 \overline{x} = \mathbf{2.114}$$
+
+$$E(Y) = 2.114 + 0.0388x$$
+
+**1.19.b** (See Appendix A.3)
+
+```{r, echo=FALSE, results=TRUE}
+dd %>%
+ggplot() +
+  geom_point(aes(x=act, y=gpa)) +
+  geom_abline(intercept = 2.11, slope = 0.0388)
+
+```
+
+This line doesn't seem to fit very well. The sample with a GPA of 0.5 is particularly far out, and may indicate some unmodelled data generation process. It may leading to an overly small slope -- a higher slope would likely fit better, assuming the outlier is removed.   
+
+**1.19.c**
+
+$E(Y) = 2.114 + 0.0388x$
+
+For x = 30:
+
+$E(Y) = 2.114 + 0.0388(30) = 3.278$
+
+**1.19.d**
+
+It is $b_1 = 0.0364$.
+
+**1.35.** Prove $\sum_{i = 1}^{n} Y_i = \sum_{i = 1}^n \hat{Y_i}$
+
+$$\sum_{i = 1}^{n} Y_i = \sum_{i = 1}^n \beta_0 + \beta_1x_i + \epsilon_i$$
+$$= \sum_{i = 1}^n \beta_0 + \beta_1x_i + \sum_{i = 1}^n \epsilon_i $$
+By 1.17, 
+$$= \sum_{i = 1}^n \beta_0 + \beta_1x_i + 0 = \sum_{i = 1}^n \beta_0 + \beta_1x_i$$
+
+$$= \sum_{i = 1}^n \mathrm{E}(Y_i) = \sum_{i = 1}^n \hat{Y_i}$$
+
+
+**1.37.** The validity of this criticism depends on how well we believe the assumptions of the model are justified. Specifically, the assumption of a simple linear relationship between lot size and work hours, and the assumption of equal random error variances. I treat these in turn, evaluating the consequences of violating them one at a time.
+
+First, the assumption of a linear relationship between lot size and work hours could be questioned. If the true relationship is linear, then data at lot sizes other than 30 are, indeed, "thrown away" to the detriment of inference. To see this, suppose that there was only one measuremet for a lot size of 30, but many measurements each at 29 and 31. Given that lot size ranges up to 80, the assumption of linearity in the neighborhood of 30 is likely very good. Hence, we should prefer a prediction based on a best fit line from 29 to 31 over the single measurement at 30, since we believe (assume) there to be random deviations in work hours around the mean.
+
+If, on the other hand, the assumption of a linear relationship is very wrong, and the true relationship is quadratic (say, showing higher efficiency for larger lot sizes), then the mean of the measurements at lot sizes of 30 may be preferred over the predicted value from a linear regression function. 
+
+Second, the assumption that the random error terms have equal variance could be questioned. Again, if this is true (along with linearity), then the best fit line is a better predictor of the mean work hours for lot sizes of 30 than the mean of the observed work hours for lot sizes of 30. However, if the variance of the error term at lot sizes of 30 is much smaller than for other lot sizes, we might prefer the mean of the observed work hours over predictions from the best fit line. 
+
+To see this, suppose the true error variance at lot sizes of 30 were 0, and the random error variance increased with lot size. Resampling would lead to many different best fit lines, and hence many different predictions for the mean of work hours at a lot size of 30, but observed values for work hours at lot sizes of 30 would all be identical, and the mean of the observed values would be the true mean. The same would be true if the random error variance at lot sizes of 30 were non-zero, but still much smaller than for other lot sizes.
+
+### Appendix A: R Code
+
+#### A.1: Question 17.b
+
+```{r, echo=TRUE, results=FALSE}
+diff(pnorm(q = c(195, 205), 
+           mean = 200, sd = sqrt(4)))
+```
+
+#### A.2: Question 19.a
+```{r, message=FALSE, echo=TRUE, results =FALSE}
+# use tidyverse
+library(tidyverse)
+
+# download data
+dd <- read_table(url(paste("http://users.stat.ufl.edu/~rrandles/sta4210/",
+                           "Rclassnotes/data/textdatasets/KutnerData/", 
+                           "Chapter%20%201%20Data%20Sets/CH01PR19.txt", 
+                           sep="")),
+                 col_names = c("gpa", "act"))
+
+# estimators
+b1 <- function(y, x) {
+  
+  # means
+  xbar <- mean(x)
+  ybar <- mean(y)
+  
+  # b1
+  sum((x - xbar) * (y - ybar)) / sum((x - xbar)^2)
+  
+}
+
+b0 <- function(y, x) {
+  
+  # means
+  xbar <- mean(x)
+  ybar <- mean(y)
+  
+  # b0 
+  ybar - b1(y, x) * xbar
+  
+}
+
+b1(dd$gpa, dd$act) 
+b0(dd$gpa, dd$act)
+
+# check with lm
+lm(formula = gpa ~ act, data=dd)
+```
+
+#### A.3: Question 19.b
+```{r, echo=TRUE, eval=FALSE}
+dd %>%
+ggplot() +
+  geom_point(aes(x=act, y=gpa)) +
+  geom_abline(intercept = 2.11, slope = 0.0388)
+
+```
+
+
+
+
+
+
+

@@ -1,0 +1,497 @@
+---
+title: 'STAT 540: Homework 3'
+author: "Tim Farkas"
+date: "9/29/2019"
+output:
+  pdf_document: default
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+Questions 3, 15, 16, 19, 20
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, results=FALSE,
+                      fig.width = 4, fig.height = 3, fig.align = "center")
+```
+
+```{r Load Libraries and Data, echo=FALSE}
+library(tidyverse)
+library(onewaytests)
+
+# gpa data
+gd <- read_table(url(paste("http://users.stat.ufl.edu/~rrandles/",
+                           "sta4210/Rclassnotes/data/textdatasets/KutnerData/",
+                           "Chapter%20%203%20Data%20Sets/CH03PR03.txt", 
+                           sep="")),
+                 col_names = c("gpa", "act", "iq", "rank"))
+
+an1 <- gd %>%
+  lm(gpa ~ act, data = .)
+
+gd <- gd %>%
+  mutate(resid = resid(an1), 
+         fitted = fitted(an1))
+
+# solution concentation data
+
+sd <- read_table(url(paste("http://users.stat.ufl.edu/~rrandles/",
+                           "sta4210/Rclassnotes/data/textdatasets/KutnerData/",
+                           "Chapter%20%203%20Data%20Sets/CH03PR15.txt",
+                           sep="")),
+                     col_names=c("conc", "time")) %>%
+  arrange(time) %>%
+  mutate(log10_conc = log(conc, 10))
+
+```
+
+
+#### Problem 3.3
+
+##### 3.3.a
+
+This boxplot is rather unexciting. It shows that the median of ACT scores is not positioned in the center of the quartiles, suggesting that the mean ACT score is lower then the median -- a left-skewed distribution of ACT values. Most importantly for analysis, however, is that the boxplot does not show any clear outliers, which can exert extreme leverage and have an outsized influence on the results of regression analysis. 
+
+```{r Boxplot of GPA Data, echo=FALSE}
+gd %>%
+  ggplot() + 
+  geom_boxplot(aes(y=act))
+
+```
+
+##### 3.3.b
+
+This dotplot is a histogram showing the frequency distribution of the error terms, and is useful to check whether the errors are normally distributed (they appear only roughly normal) and whether there are any outliers in the data, which there also appear to be. In particular the observation showing a residual near -3 clearly lies far outside the distribution of errors, and is an outlier worth considering for removal. 
+
+```{r Dotplot of residuals, echo=FALSE}
+
+gd %>% 
+  ggplot() +
+  geom_dotplot(aes(x=resid))
+
+```
+
+##### 3.3.c
+
+The plot of fitted values vs. residuals is especially good for evaluating whether 1) the regression function is appropriate in shape, and 2) whether the assumption of constant variance is satisfied. In this case, I would probably argue that there are no clear trends in either case, though the outlier, as identified in 3.3.b, is also visible here, and again should be considered for removal. 
+
+```{r Fitted vs. Residuals, echo=FALSE}
+gd %>% 
+  
+  ggplot() +
+  geom_point(aes(x=fitted, y=resid))
+```
+
+##### 3.3.d
+
+The coefficient of correlation for the ordered residuals and expected value under the assumption of normality is $\rho$ = 0.974. Although this is a high corellation coefficient in general, the critical value $\rho^*$ = 0.987 given 120 observations at $\alpha$ = 0.05. Because the observed $\rho$ is less than the critical value, we reject the null hypothesis that the errors are normally distributed. However, it again appears that the outlier discussed above is causing trouble here, too. When removed, $\rho$ = 0.988, and we fail to reject the hypothesis of non-normal error distribution.
+
+```{r, echo=FALSE, results=FALSE}
+gd %>%
+  ggplot(aes(sample=resid)) +
+  stat_qq() -> qplot
+
+qplot
+
+qd <- ggplot_build(qplot)$data[[1]] %>%
+  dplyr::select(sample, theoretical)
+
+cor(qd$sample, qd$theoretical) # .9744497
+cor(qd$sample[-1], qd$theoretical[-1]) # 0.988
+```
+
+##### 3.3.e
+
+The critical value for the Brown-Forsythe test statistic $t^*_{BF}$ = 2.617, so we reject the null hypothesis of equal error variance between the two groups if $|t^*_{BF}|$ > 2.617. The observed value of the test statitistic is 0.009, hence we fail to reject the hypothesis of constant variance. The outlier that was problematic before is likely less problematic here because the BF-test is robust due to working with medians and absolute deviation, rather than means and squared deviation. 
+
+```{r, echo=FALSE, results=FALSE}
+gd %>%
+  mutate(bf_group = as.factor(ifelse(act < 26, 1, 0))) %>%
+  bf.test(resid ~ bf_group, data=., alpha=0.01)
+```
+
+##### 3.3.f
+
+Although it is unclear whether school rank shows any trend with the residuals, IQ clearly shows a strong pattern. Residuals are larger, i.e., students have higher GPA than predicted by ACT alone, when they have a high IQ. IQ should likely be included in the model. 
+
+```{r, echo=FALSE, results=FALSE}
+gd %>%
+  gather(key = "variable", value="score", iq, rank ) %>%
+  
+  ggplot() +
+  geom_point(aes(x=score, y=resid)) +
+  facet_wrap(~ variable, scales="free")
+```
+
+#### Problem 3.15
+
+##### 3.15.a
+
+```{r, echo=FALSE}
+
+an2 <- lm(conc ~ time, data=sd)
+an3 <- sd %>% 
+  mutate(f.time = as.factor(time)) %>%
+  lm(conc ~ f.time, data=.)
+
+anova(an2, an3)
+qf(1 - 0.025, 3, 10)
+
+library(alr3)
+
+pureErrorAnova(an2) # check!
+```
+
+The linear regression function is
+
+$$ Y = 2.575 - 0.324X$$
+##### 3.15.b
+
+
+$$H_0: E\{Y\} = \beta_0 + \beta_1X$$
+$$H_{\alpha}: E\{Y\} \ne \beta_0 + \beta_1X$$
+We reject $H_0$ if 
+
+$$|F^*| > F(0.975; 3, 10) = 4.826$$
+
+$F^* = 58.603 > 4.826$, hence we reject the simple linear regression in favor of a more complex model.
+
+##### 3.15.c. 
+
+No, the rejection of a simple linear regression model does not indicate which model is the most appropriate. This test is _extremely_ liberal, since it fits a separate mean for each level of X, and hence is the most complex model that is sensible for data with replicates (it is an ANOVA model, treating each level of X as a group). It will fit better than all simpler models (judged by $R^2$), but a simpler model may be preferred, depending on the increase in fit due to the additional complexity. We may prefer a simpler model when looking, for example, at the $adj-R^2$ or AIC values.
+
+#### Problem 3.16
+
+##### 3.16.a
+
+```{r, echo=FALSE}
+sd %>%
+  ggplot() + 
+  geom_point(aes(x=time, y=conc))
+```
+
+Given the concave shape and tightening variance with increasing time, I would attempt a logarithmic transformation of the concentration values. 
+
+##### 3.16.b
+
+```{r, echo=FALSE, results=TRUE}
+library(MASS)
+library(kableExtra)
+bc <- boxcox(conc ~ time, data=sd, 
+       lambda = c(-.2, -.1, 0, .1, .2))
+
+k2 <- prod(sd$conc) ^ (1/length(sd$conc))
+
+cbind(matrix(seq(-.2, .2, .1), ncol=1), 
+      as.matrix(sapply( seq(-.2, .2, .1),
+                     function(lambda) {
+  
+  k1 <- 1 / (lambda * k2^(lambda - 1))
+  
+  errs <- sd %>%
+    mutate(ell = lambda,
+           kay1 = k1, 
+           kay2 = k2,
+           yt1 = ifelse(ell == 0, log(conc), (conc^ell-1)/ell),
+           yt2 = ifelse(ell == 0, kay2*log(conc), kay1 * (conc^ell - 1))) %>%
+  lm(yt2 ~ time, data=.) %>%
+    resid()
+  
+   sum(errs^2)
+  
+}))) %>%
+  kable(col.names = c("lambda", "SSE"))  %>%
+  kable_styling(latex_options = c("striped"))
+```
+
+$\lambda = 0$ is within the 95% confidence intervals for the power transformation, and as a lower SSE than the other tested lambdas. Hence, the log transformation is recommended by the Box-Cox procedure.
+
+##### 3.16.c
+
+```{r, echo=FALSE}
+sd %>% 
+  lm(log10_conc ~ time, data= .)
+```
+
+$$log_{10}(Y) = 0.655 - 0.1954X$$
+
+##### 3.16.d
+
+```{r, echo=FALSE}
+sd %>%
+  ggplot() +
+  geom_point(aes(y=log10_conc, x=time))
+```
+
+Wow, yes. This transformation appears to have completely solved both the non-linearity and heterogeneity of variance problems with the regression of raw concentration on time. 
+
+##### 3.16.e
+
+```{r, echo=FALSE}
+sd %>%
+  mutate(errs = residuals(lm(log10_conc ~ time)),
+         fitted = fitted(lm(log10_conc ~ time))) %>%
+  ggplot() + 
+  geom_point(aes(y = errs, x = fitted))
+
+sd %>%
+  mutate(errs = residuals(lm(log10_conc ~ time)),
+         fitted = fitted(lm(log10_conc ~ time))) %>%
+  ggplot() + 
+  geom_qq(aes(sample = errs))
+
+
+```
+
+Both of these plots look excellent. The plot of residuals vs. fitted values shows no apparent trends of location or variance, and the half-normal plot shows only modest devation from a straight line, indicating a strong accordance of the errors with a normal distribution.  
+
+##### 3.16.f
+
+```{r, echo=FALSE}
+
+10^.655 # b0 = 4.519
+10^(.1954) # b1 = -1.568
+```
+In the original scale, the regression function is
+
+$$Y = 4.519 - 1.568X$$
+
+#### Exercise 3.19 
+
+
+This difference arises because residuals are not independent of one another, because they are all dependent on Y. Hence we expect there to be a positive relationship between Y values and residuals -- highly positive residuals are more likley to be caused by high Y values than low Y values. Assuming the regression function yields a good fit and their is constancy of variance, the residuals are independent of the fitted values
+
+
+#### Exercise 3.20
+
+
+The error terms will not be changed due to a tranformation of $X^* = 1/X$ because the distribution of the error terms is determined solely by the data generating process of Y values. For this reason, the distribution of the error terms will be influenced by the transformation $Y^* = 1/Y$. 
+
+According to probability theory, the distribtion of the error terms will be transformed from
+
+$$f(y) = \frac{1}{\sqrt{2\pi}}e^{-\frac{y^2}{2}}$$
+to 
+
+$$f(y^*) = f(\frac{1}{y}) = \frac{1}{y^2\sqrt{2\pi}}e^{-\frac{1}{2y^2}}$$
+as shown in the follow figure:  
+
+```{r, echo=FALSE}
+pin <- function(y) {
+  (1/(y^2*sqrt(2*pi))) * exp(-1*(1/(2*y^2)))
+}
+
+pn <- function(y) {
+  
+  (1/sqrt(2*pi) * exp(-y^2/2))
+}
+ys <- c(seq(-5, -.01, length.out = 500), seq(.01, 5, length.out = 500))
+pees <- pin(ys)
+pees2 <- pn(ys)
+
+tibble(y = rep(c(seq(-5, -.01, length.out = 500), seq(.01, 5, length.out = 500)), 2),
+       dist = c(rep("norm", 1000), rep("inv", 1000)),
+       prob = c(pn(ys), pin(ys))) %>%
+  ggplot() +
+  geom_line(aes(x=y, y=prob, color=dist))
+
+```
+
+#### Appendix: R Code
+
+Preliminary
+
+```{r, echo=TRUE, results=FALSE, eval=FALSE}
+library(tidyverse)
+library(onewaytests)
+
+# gpa data
+gd <- read_table(url(paste("http://users.stat.ufl.edu/~rrandles/",
+                           "sta4210/Rclassnotes/data/textdatasets/KutnerData/",
+                           "Chapter%20%203%20Data%20Sets/CH03PR03.txt", 
+                           sep="")),
+                 col_names = c("gpa", "act", "iq", "rank"))
+
+an1 <- gd %>%
+  lm(gpa ~ act, data = .)
+
+gd <- gd %>%
+  mutate(resid = resid(an1), 
+         fitted = fitted(an1))
+
+# solution concentation data
+
+sd <- read_table(url(paste("http://users.stat.ufl.edu/~rrandles/",
+                           "sta4210/Rclassnotes/data/textdatasets/KutnerData/",
+                           "Chapter%20%203%20Data%20Sets/CH03PR15.txt",
+                           sep="")),
+                     col_names=c("conc", "time")) %>%
+  arrange(time) %>%
+  mutate(log10_conc = log(conc, 10))
+
+```
+
+3.3.a
+
+```{r, echo=TRUE, results=FALSE, eval=FALSE}
+gd %>%
+  ggplot() + 
+  geom_boxplot(aes(y=act))
+
+```
+
+3.3.b 
+
+```{r, echo=TRUE, results=FALSE, eval=FALSE}
+
+gd %>% 
+  ggplot() +
+  geom_dotplot(aes(x=resid))
+
+```
+
+3.3.c 
+
+```{r, echo=TRUE, results=FALSE, eval=FALSE}
+gd %>% 
+  
+  ggplot() +
+  geom_point(aes(x=fitted, y=resid))
+```
+
+3.3.d 
+
+```{r, echo=TRUE, results=FALSE, eval=FALSE}
+gd %>%
+  ggplot(aes(sample=resid)) +
+  stat_qq() -> qplot
+
+qplot
+
+qd <- ggplot_build(qplot)$data[[1]] %>% 
+  select(sample, theoretical)
+
+cor(qd$sample, qd$theoretical) # .9744497
+cor(qd$sample[-1], qd$theoretical[-1]) # 0.988
+```
+
+3.3.e
+
+```{r, echo=TRUE, results=FALSE, eval=FALSE}
+gd %>%
+  mutate(bf_group = as.factor(ifelse(act < 26, 1, 0))) %>%
+  bf.test(resid ~ bf_group, data=., alpha=0.01)
+```
+
+3.3.f 
+
+```{r, echo=TRUE, results=FALSE, eval=FALSE}
+gd %>%
+  gather(key = "variable", value="score", iq, rank ) %>%
+  
+  ggplot() +
+  geom_point(aes(x=score, y=resid)) +
+  facet_wrap(~ variable, scales="free")
+```
+
+3.16.a
+
+```{r, echo=TRUE, results=FALSE, eval=FALSE}
+sd %>%
+  ggplot() + 
+  geom_point(aes(x=time, y=conc))
+```
+
+3.16.b
+
+```{r, echo=TRUE, results=FALSE, eval=FALSE}
+library(MASS)
+library(kableExtra)
+bc <- boxcox(conc ~ time, data=sd, 
+       lambda = c(-.2, -.1, 0, .1, .2))
+
+k2 <- prod(sd$conc) ^ (1/length(sd$conc))
+
+cbind(matrix(seq(-.2, .2, .1), ncol=1), 
+      as.matrix(sapply( seq(-.2, .2, .1),
+                     function(lambda) {
+  
+  k1 <- 1 / (lambda * k2^(lambda - 1))
+  
+  errs <- sd %>%
+    mutate(ell = lambda,
+           kay1 = k1, 
+           kay2 = k2,
+           yt1 = ifelse(ell == 0, log(conc), (conc^ell-1)/ell),
+           yt2 = ifelse(ell == 0, kay2*log(conc), kay1 * (conc^ell - 1))) %>%
+  lm(yt2 ~ time, data=.) %>%
+    resid()
+  
+   sum(errs^2)
+  
+}))) %>%
+  kable(col.names = c("lambda", "SSE"))  %>%
+  kable_styling(latex_options = c("striped"))
+```
+
+3.16.c
+
+```{r, echo=TRUE, results=FALSE, eval=FALSE}
+sd %>% 
+  lm(log10_conc ~ time, data= .)
+```
+
+3.16.d
+
+
+```{r, echo=TRUE, results=FALSE, eval=FALSE}
+sd %>%
+  ggplot() +
+  geom_point(aes(y=log10_conc, x=time))
+```
+
+3.16.e
+```{r, echo=TRUE, results=FALSE, eval=FALSE}
+sd %>%
+  mutate(errs = residuals(lm(log10_conc ~ time)),
+         fitted = fitted(lm(log10_conc ~ time))) %>%
+  ggplot() + 
+  geom_point(aes(y = errs, x = fitted))
+
+sd %>%
+  mutate(errs = residuals(lm(log10_conc ~ time)),
+         fitted = fitted(lm(log10_conc ~ time))) %>%
+  ggplot() + 
+  geom_qq(aes(sample = errs))
+
+```
+
+3.16.f 
+
+```{r, echo=TRUE, results=FALSE, eval=FALSE}
+
+10^.655 # b0 = 4.519
+10^(.1954) # b1 = -1.568
+```
+
+3.20
+
+```{r, echo=TRUE, results=FALSE, eval=FALSE}
+pin <- function(y) {
+  (1/(y^2*sqrt(2*pi))) * exp(-1*(1/(2*y^2)))
+}
+
+pn <- function(y) {
+  
+  (1/sqrt(2*pi) * exp(-y^2/2))
+}
+ys <- c(seq(-5, -.01, length.out = 500), seq(.01, 5, length.out = 500))
+pees <- pin(ys)
+pees2 <- pn(ys)
+
+tibble(y = rep(c(seq(-5, -.01, length.out = 500), seq(.01, 5, length.out = 500)), 2),
+       dist = c(rep("norm", 1000), rep("inv", 1000)),
+       prob = c(pn(ys), pin(ys))) %>%
+  ggplot() +
+  geom_line(aes(x=y, y=prob, color=dist))
+
+```

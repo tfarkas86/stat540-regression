@@ -1,0 +1,210 @@
+---
+title: 'STAT 550: Homework 6'
+author: "Tim Farkas"
+date: "12/3/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+### Problem 9.25
+```{r}
+sd <- read_table(url(paste("http://users.stat.ufl.edu/~rrandles/sta4210/",     
+                           "Rclassnotes/data/textdatasets/KutnerData/", 
+                           "Appendix%20C%20Data%20Sets/APPENC01.txt", 
+                           sep="")),
+                 col_names = c("id", "stay", "age", "risk", "culture", "xray",
+                               "beds", "sch", "region", "census", 
+                               "nurses", "facs")) %>%
+  select(-sch, -region) %>%
+  mutate(log.stay = log(stay, 10))
+
+sd.train <- sd %>%
+  slice(57:113)
+
+```
+
+#### 9.25.a  
+```{r}
+sd.train %>% 
+  gather(key = "variable", value="value", age:facs) %>%
+  ggplot(aes(y=log.stay, x=value)) + 
+  geom_point() +
+  facet_wrap(~ variable, scales="free")
+```
+
+Based on these scatterplots, there appears to be one observation with especially high length of stay, visible in all eight plots. As for predictors, there is a clear outlier in the census count, showing an extremely high number around 800. No other predictors show clear extreme values, although most other variables show a long upper tail, with culture ratio being possible the most extreme. Dot plots would be helpful here. 
+
+#### 9.25.b
+
+```{r}
+sd.train %>%
+  select(-id, -stay, -log.stay) %>%
+  GGally::ggpairs()
+```
+
+Yes, based on the pairwise scatterplots and correlation coefficients, there is especially high positie association between the number of beds, census, number of nurses, and % of facilities provide, ranging in correlation between 0.71 and 0.99. Other potentially problematic correlations range up to 0.53.
+
+#### 9.25.c
+
+```{r}
+ans.bs <- leaps::leaps(x=as.matrix(sd.train %>% select(age:facs)), 
+                       y=as.matrix(sd.train %>% select(log.stay)), 
+                       method="Cp")
+
+sets <- ans.bs$which[order(ans.bs$Cp)[1:3], ]
+colnames(sets) <- names(sd.train)[3:10]
+knitr::kable(sets)
+```
+
+The three best models all include age, xray ratio, and census, and exclude risk of infection, culture ratio, and facility availability. The best model additionally excludes the numbers of beds and nurses, the second best excludes the number of beds, and the third best excludes the number of nurses. The best mode, with p = 4, appears to have the smallest bias, given a Cp of 3.81. The other models, with p = 5, show Cp values of 3.9 and 4.26, each more distant from 5 than 3.81 is from 4. 
+
+### Problem 9.27
+
+#### 9.27.a  
+
+```{r}
+sd.valid <- sd %>%
+  slice(1:56)
+
+an.train <- lm(log.stay ~ age + xray + census, 
+               data=sd.train)
+summary(an.train)
+
+an.test <- lm(log.stay ~ age + xray + census, 
+              data=sd.valid)
+
+summary(an.test)
+```
+
+The statstical results for the training and validation models are remarkably similar. Parameter estimates are very close for age (training: 0.00388 vs. validation: 0.00399) and xray ratio (0.00175 vs. 0.01522), whereas the estimates for census are twice as high for training set (0.0002926 vs. 0.0001568). MSEs are very close (0.00305 vs. 0.00423). R-squared values, on the other hand, are rather different (0.5192 for training vs. 0.2934 for validation). This is reflected in standard error values for the coefficients that are larger for the validation set, especially for the census parameter. Age: 0.00163 vs. 0.00211; Xray: 0.000419 vs. 0.000437; Census: 0.00004558 vs. 0.00006216.
+
+#### 9.27.b
+
+```{r}
+preds <- predict(object  = an.train, 
+                 newdata = sd.valid %>% select(age, xray, census))
+
+sum((sd.valid %>% 
+       pull(log.stay) - preds)^2) / nrow(sd.valid)
+```
+
+The MSPR is 0.004612, which is somewhat higher from the MSE for the training set (0.00305). Hence, the predictive capability of the training set is not particularly good.
+
+#### 9.27.c
+
+```{r}
+an.full <- lm(log.stay ~ age + xray + census, 
+              data=sd)
+summary(an.full)
+```
+
+The parameter estimates for the model with all the data shows remarkably similar results, whereas the standard errors are higher for xray and census. These findings are expected: Insofar as the training set represents the data well, the patterns of relationships should be the same when including the full dataset. On the other hand, the training set has a much smaller sample size than the full set, hence we expect the estimates of standard errors to be higher. 
+
+### Problem 10.3  
+
+Personally, I believe that an "outlier" should be defined as an observation whose values are influenced by processes both 1) not modeled explicitly, and 2) not influencing other observations. If the processes are modeled, then they will not cause influence. If they influence other observations, then the values of all observations will be similarly influenced, and the "outlier" will not exist. Hence, if a value appears relatively extreme, two things may be ocurring. Either 1) the assumptions of the model that lead to identification of the outlier are incorrect, and the outlier is not an outlier, or 2) the outlier indeed was generated by an unmodeled process no influencing other observations. To remove the outlier is to decide that the assumptions of the model are correct, and the outlier is indeed influenced by a unique, unmodeled process. Therefore, it makes sense to remove the out if *and only if* you can make an argument for #2 over #1. Such an argument may come from strong theory for the model assumptions, strong prior evidence the model assumptions are true, or immediate evidence of the unique unmodeled process. 
+
+### Problem 10.27
+
+#### 10.27.a  
+
+```{r}
+an10 <- lm(log.stay ~ age + xray + census, data = sd.train)
+
+sd.train %>%
+  select(age, xray, census) %>%
+  mutate(age.xray = age * xray, 
+         age.census = age * census, 
+         xray.census = xray * census, 
+         resid = residuals(an10),
+         fit   = fitted(an10),) %>%
+  select(resid, fit, age:xray.census) %>%
+  gather(key="variable", value="value", fit:xray.census) %>%
+  ggplot(aes(y=resid, x=value)) + 
+  geom_point() +
+  facet_wrap(~ variable, scales="free")
+```
+
+These plots do not show any evidence of either improper function shape or heteroscedasticity, so I don't think any quadratic terms or interactions should be included in the model, nor do I think remedial measures need to be taken to stabilize the variance. There does appear to be X outliers in the data, both in xray and census, which many need to be dealt with. 
+
+#### 10.27.b  
+
+```{r}
+qout <- qqnorm(resid(an10))
+cor(qout$x, qout$y)
+```
+
+The normal probability plot does not show any clear deviations from normality, and the correlation coefficient is 0.9886. The critical value $\rho^*_{60} = 0.0984$, so this test fails to reject the null hypothesis of normally distributed errors.  
+
+
+#### 10.27.c  
+
+```{r}
+sd.train %>%
+  select(age, xray, census) %>%
+  GGally::ggpairs()
+
+car::vif(an10)
+```
+
+The scatterplot and correlation matrices show no troublesome pairwise correlations, and the variance inflation factors are all between 1 and 2, supporting the conclusion that there is no problematic multicollinearity.
+
+#### Problem 10.27.d  
+
+```{r}
+
+hat <- influence(an10)$hat
+err <- as.matrix(resid(an10))
+sse <- t(err) %*% err
+
+sdr <- c(err * sqrt((length(err) - 4 - 1) / (sse * (1 - hat) - err^2)))
+
+tibble(sdr) %>%
+  ggplot(aes(x=sdr)) +
+  geom_dotplot()
+
+bonft <- qt(1 - 0.01/(2 * length(err)), length(err) - 4 - 1) # 4.04
+
+any(abs(sdr) > bonft) # none!
+
+```
+
+Reject observation as non-outlier if 
+
+$$|t_i| > t_{52}(0.995) = 4.04247$$
+No studentized deleted residual exeeds the bonferroni test statistic of 4.04247, hence we conclude there are no outlying Y observations. 
+
+#### 10.27.e   
+
+```{r}
+hat <- influence(an10)$hat
+rule <- 2*4/length(hat)
+xout <- hat[hat > rule]
+
+as.numeric(names(xout)) + 56
+```
+
+Six leverage values are greater than $\frac{2p}{n} = 0.1403$, ranging from 0.1421 to 2.8816.
+
+#### 10.27.f  
+
+```{r}
+cases <- c(62, 75, 102, 112, 87) 
+
+as_tibble(influence.measures(an10)$infmat) %>%
+  slice(cases- 56) %>%
+  mutate(case=cases, 
+         pf = round(pf(cook.d, 4, 53), 5)) %>% 
+  select(case, dfb.age:dffit, cook.d, pf) %>%
+  knitr::kable()
+
+
+```
+
+The DFFITS value exceeds 1 only for record 112 (= 1.2), Cook's Distance exceeds 10% of the F distribution for 112 (pf = 0.15), and DFBETAS exceeds 1 only for the census and case 112. The influence metrics are in agreement that observation 112 is causing undue influence on the results of the model, and is a candidate for exclusion. 
+
+

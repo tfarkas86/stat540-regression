@@ -1,0 +1,370 @@
+---
+title: 'STAT 540: Homework 2'
+author: "Tim Farkas"
+output:
+  pdf_document: default
+  html_notebook: default
+  word_document: default
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+**2.1.a** Yes, the student is warranted in concluding that there is a linear association between X and Y, because the 95% confidence interval for the slope does not include zero. The implied level of significance is $\alpha$ = 0.05.
+
+To be clear, testing for a "linear association" here does not indicate a test for linear shape to the relationship between X and Y. Indeed, a quadratic or other shape may better describe the relationship. The simple linear regression model *assumes* a linear shape, so a test of linear association is strictly asking whether the slope of the best fit (straight) line is different from zero, regardless of whether there is a better model of the relationship.
+
+**2.1.b** This is not necessarily a problem for the model, since x = 0 is out of the model scope. The true relationship between X and Y could indeed be (at least roughly) linear within the scope of the model, but non-linear for a model with a broader scope that includes x = 0. Nevertheless, the critic is correct that an extrapolated linear model must go through 0, indicating that a model with a scope including x = 0 must be non-linear. This *could* indicate non-linearity within the scope of the current model, so the student should check.
+
+**2.3** The P-value for the estimated slope is 0.91, indicating that there is a 0.91 probability of observing a slope at least as extreme (positive or negative) as the observed value (-0.18) given a true slope of 0. This is a very high probability, hence the student should have concluded that the study failed to demonstrate any relationship between expenditures and sales.
+
+**2.4.a** The confidence interval for $\beta_{1}$ can be calculated as
+
+$$b_1 \pm t(1 - \frac{\alpha}{2}, n - 2)s\{b_1\}.$$
+Where $b_1$ = 0.03883, $\alpha$ = 0.01, and n = 120,
+
+$$ t(1 - \frac{\alpha}{2}, n - 2) = 2.618$$
+
+$$s\{b_1\} = \sqrt{\frac{MSE}{\sum{(X_i - \overline{X})^2}}} = \sqrt{\frac{\frac{SSE}{n - 2}}{\sum{(X_i - \overline{X})^2}}} = 0.01277$$ 
+
+Hence, confidence intervals for $\beta_1$ are 
+
+$$0.03883 \pm 2.618(0.1277)$$ 
+$$0.005388 \le \beta_1 \le 0.07227$$
+
+
+```{r, message=FALSE, echo=FALSE, results=FALSE}
+# use tidyverse
+library(tidyverse)
+
+# download data
+dd <- read_table(url(paste("http://users.stat.ufl.edu/~rrandles/sta4210/",
+                           "Rclassnotes/data/textdatasets/KutnerData/", 
+                           "Chapter%20%201%20Data%20Sets/CH01PR19.txt", 
+                           sep="")),
+                 col_names = c("gpa", "act"))
+
+# caculate t-value
+tstar <- qt(1 -.01/2, 120 - 2)
+
+# calculate standard error for b1
+errs <- lm(gpa ~ act, dd)$resid
+sse <- sum(errs^2)
+mse <- sse / (nrow(dd) - 2)
+
+sdb1 <- sqrt(mse/sum((dd$act - mean(dd$act))^2))
+
+0.03883 + tstar*sdb1
+0.03883 - tstar*sdb1
+
+# check with lm
+an1 <- lm(formula = gpa ~ act, data=dd)
+confint(object = an1, level = 0.99)
+```
+
+The confidence interval for $\beta_1$ does not overlap 0, indicating a positive association between ACT scores and college GPA at P < 0.01. The director of admissions would be interested in this test to determing whether there they can predict student performance (as measured by GPA) using ACT scores.
+
+**2.4.b** To test for a linear association between GPA and ACT, we construct the test:
+
+$$H_0: \beta_1 = 0$$
+$$ H_{\alpha}: \beta_1 \ne 0  $$
+We reject the null hypothesis with confidence at $\alpha$ = 0.01 if the test statistic 
+
+$$t^* = \frac{b_1}{s\{b_1\}} > t(1 - \frac{\alpha}{2}, n - 2)$$
+
+For 
+
+$$ t(1 - \frac{\alpha}{2}, n - 2) = 2.618$$
+
+The rejection region is 
+
+$$|t^*| > 2.618$$
+
+The t-statistic for $\beta_1$ is 
+
+```{r, echo=FALSE, results=FALSE, echo=FALSE}
+# calculate t-statistic
+0.03883 / 0.01277
+
+# check with lm
+summary(lm(gpa ~ act, dd))$coefficients
+```
+
+
+$$t^* = \frac{b_1 - \beta_{10}}{s\{b_1\}} = \frac{0.03883 - 0}{0.01277}=3.0472$$
+and
+
+$$ 3.0472 = t^* > t(1 - \frac{\alpha}{2}, n - 2) = 2.618$$
+Hence we conclude there is a linear association between ACT scores and GPA.
+
+**2.4.c** The two-tailed *P*-value for the test statistics $t^*$= 3.0472 is calculated as 
+
+```{r, results=FALSE, echo=FALSE}
+# cumulative density function
+2*(1 - pt(3.0472, nrow(dd)-2))
+```
+
+
+$$1 - \mathrm{P}(-|t^*| \le t \le |t^*|) = 2(1 - \mathrm{P}(t_{n-2} \le t^*))$$
+$$= 2(1 - P(t_{n-2} \le 3.0472) = 0.00285$$
+
+This supports the conclusion in Part b by calculating exactly the probability of achieving a $b_1$ value equal to or more extreme than the observed value. The result, *P* = 0.00283 shows that we can reject the null hypothesis with even more confidence than in Part b.  
+
+**2.13.a** To construct a confidence interval for the mean of GPA = $E(Y_h)$ at an ACT score of $X_h$ = 28, we calculate 
+
+$$\hat{Y}_h \pm t(1 - \frac{\alpha}{2}, n - 2)s\{\hat{Y}_h\}$$
+where
+
+$$\hat{Y}_h = b_0 + b_1X_h = 2.114 + (0.03883)*28 = 3.201  $$
+
+$$s\{\hat{Y}_h\} = \sqrt{MSE\left(\frac{1}{n} + \frac{(X_h - \overline{X})^2}{\sum(X_i - \overline{X})^2}\right)} = 0.0706$$
+ 
+Hence, confidence interval for $\hat{Y_h}$ is 
+
+$$3.201 \pm 1.98(0.0706) = $$ 
+$$3.0612 \le E(Y_h) \le 3.3408$$
+This interval will capture the true mean for GPA of students with ACT scores of 28 with 95% confidence.
+ 
+```{r, echo=FALSE, results=FALSE}
+an1 <- lm(gpa ~ act, dd)
+summary(an1)
+
+# standard error of Y hat at h = 28
+yhat_sd <- sqrt(mse * ((1 / nrow(dd) + (28 - mean(dd$act))^2 / sum((dd$act - mean(dd$act))^2))))
+
+# t value
+qt(1-.025, 118)
+
+# standard error of Yhat_new
+yhat_new <- sqrt(mse * (1 + (1 / nrow(dd) + (28 - mean(dd$act))^2 / sum((dd$act - mean(dd$act))^2))))
+```
+
+**2.13.b** To construct a prediction interval for a new observation of GPA ($\hat{Y}_{h(new)}$) for a student with an ACT score of $X_h$ = 28, we calculate 
+
+$$\hat{Y}_h \pm t(1 - \frac{\alpha}{2}, n - 2)s\{pred\}$$
+where
+
+$$\hat{Y}_h = b_0 + b_1X_h = 2.114 + (0.03883)*28 = 3.201  $$
+
+$$s\{pred\} = \sqrt{MSE\left(1 + \frac{1}{n} + \frac{(X_h - \overline{X})^2}{\sum(X_i - \overline{X})^2}\right)} = 0.6271$$
+ 
+Hence, prediction interval for $\hat{Y}_{h(new)}$ is 
+
+$$3.201 \pm 1.98(0.6271) = $$ 
+$$1.9593 \le \hat{Y}_{h(new)} \le 4.4427$$
+This interval will capture a new observation of GPA for students with ACT scores of 28 with 95% confidence.
+
+**2.13.c** The prediction inverval from b is much wider than the confidence intercan in a, as it should be. The prediction interval will be wider than the confidence interval by twice the estimate of standard deviation of the error terms (2 * MSE).
+
+**2.13.d** Boundary values for the regression line at ACT = 28 are calculated as 
+$$\hat{Y}_h \pm Ws\{\hat{Y}_h\}$$
+
+where
+
+$$W = \sqrt{2F(1 - \alpha; 2, n - 2)}$$
+$$ = \sqrt{2F(1 - 0.05, 2, 118)} = 2.48$$
+For $\hat{Y}_h$ = 3.201 when ACT = 28, and $s\{\hat{Y}_h\} = 0.0706$, the boundary values are
+
+$$ 3.026 \le \hat{Y}_h \le 3.376$$
+The interval boundaries based on a confidence band for the regression line is wider than for the interval on $E\{\hat{Y}_h\}$ because the current interval must capture the entire regression line with 95% confidence, whereas the other interval need only do so for values at ACT = 28.
+
+```{r, echo=FALSE, results = FALSE}
+sqrt(2 * qf(.95, 2, 118)) * 0.0706
+```
+
+
+
+**2.23.a** 
+
+```{r, echo=FALSE, message=FALSE}
+ssto <- round(sum((dd$gpa - mean(dd$gpa))^2), 3)
+sse <- round(sum(resid(an1)^2), 3)
+ssr <- ssto - sse
+mse <- round(sse/(nrow(dd) - 2), 3)
+msr <- ssr/1
+frat <- round(msr/mse, 3)
+
+library(tidyverse)
+library(kableExtra)
+library(knitr)
+options(knitr.table.format = "latex")
+
+anova_table <- data.frame(Source=c("Regression", "Error", "Total"), 
+                      SS = c(ssr, sse, ssto), 
+                      df = c(1, nrow(dd) - 2, nrow(dd) - 1),
+                      MS = c(msr, mse, NA), 
+                      "F" = c(frat, NA, NA))
+
+kable(anova_table) %>%
+  kable_styling(latex_options = c("striped"))
+```
+**2.23.b** The MSR estimates the average reduction in squared error per additional parameter included in the model (here, only 1), relative to a model that considers only the mean of Y. MSE estimates the average squared error given the full model (here, a model that includes only the mean of Y and the relationship between X and Y) -- this is also the variance of the (identically distributed) error terms. MSR also estimates the variance of the error terms when $\beta_1$ is 0.
+
+**2.23.c** The $F^*$-statistic is distributed
+
+$$ F^* = \frac{MSR}{MSE} \sim F(1, n-2)$$
+
+Hence, for the test
+
+$$H_0: \beta_1 = 0$$
+$$H_{\alpha}: \beta_1 \ne 0$$
+the rejection region for $F^*$ at $\alpha$ = 0.01 is 
+
+```{r, echo=FALSE, results=FALSE}
+qf(1-.01, 1, 118)
+```
+
+
+$$F^* = 9.245 > F(1 - \alpha; 1, n-2 ) = 6.855$$
+
+Hence, we reject the null hypothesis with confidence at $\alpha$ = 0.01.
+
+**2.23.d** The variance in Y is reduced by the value of SSR = 3.587. Relative to the total variance (SSTO = 49.405), the variance in Y is reduced by 
+
+$$ \frac{SSR}{SSTO} = \frac{3.587}{49.405} = 0.0726$$
+
+This is $R^2$, the coefficient of determination.
+
+**2.23.e** 
+
+$$ r = \frac{b_1}{|b_1|} \sqrt{R^2} = 0.2695$$
+**2.23.f** I'm unclear on what "operational" means here, but the correlation coefficient contains more information about the pattern of relationship between X and Y, since it indicates the sign of the relationship in addition to the magnitude. For interpretation of magnitude, the coefficient of determination is slightly better, since it is easily understood as the proportion of variation in Y explained by X. It also has the benefit of functioning well for more complex models where a single sign of relationship is non-sensical.
+
+**2.34.a** It makes more sense to consider ACT scores as random variables. Just in the way we "know" students GPAs, we "know" their ACT scores. The reason both should be thought of as random variables is that they are measurements of (true) student ability and knowledge that are subject to some (measureable) degree of random error. Error, in the case of the ACT might be attributable to unmeasured variables, such as amount of sleep, proper nutrition, and emotional state, each of which may vary at the time of test-taking among students with the same ability. 
+
+**2.34.b** No, considering ACT scores as a random variable will not have an effect on prediction intervals. This is because the construction of any one prediction interval for GPA requires an assumption of an ACT score. Hence, starting with a bivariate normal distribution, we would use the conditional probability distribution for GPAs when ACT is some known value, which reduces the probability distribution to a normal error regression model. 
+
+**2.50** Derive $\sum{k_iX_i} = 1$.
+
+Where 
+
+$$k_i = \frac{X_i - \overline{X}}{\sum(X_i - \overline{X})^2}$$
+
+$$\sum{k_iX_i} = \sum{X_i\frac{X_i - \overline{X}}{\sum(X_i - \overline{X})^2}}$$
+$$= \frac{\sum{(X_i^2 - X_i\overline{X})}}{\sum(X_i - \overline{X})^2}$$
+
+So the proof reduces to showing:
+
+$$SS_X = \sum(X_i - \overline{X})^2 = \sum{(X_i^2 - X_i\overline{X})}.$$
+
+$$\sum(X_i - \overline{X})^2 = {\sum(X_i^2 - 2X_i\overline{X} +  \overline{X}^2)}$$
+$$= {\sum(X_i^2 - X_i\overline{X}) +  n\overline{X}^2 - \sum{X_i\overline{X}}}$$
+$$= {\sum(X_i^2 - X_i\overline{X}) +  \overline{X}(n\overline{X} - \sum{X_i})}$$
+
+
+$$= {\sum(X_i^2 - X_i\overline{X}) +  \overline{X}(n\frac{\sum{X_i}}{n} - \sum{X_i})}$$
+
+$$= {\sum(X_i^2 - X_i\overline{X}) +  \overline{X}(\sum{X_i} - \sum{X_i})}$$
+$$= {\sum(X_i^2 - X_i\overline{X}) + \overline{X}(0)}$$
+$$= {\sum(X_i^2 - X_i\overline{X})}$$
+**2.51**
+
+$$E(b_0) = E(\overline{Y} - b_1\overline{X}) $$
+$$ = \frac{1}{n}E(\sum{Y_i}) - \overline{X}E(b_1)$$
+$$\frac{1}{n}\sum{E(Y_i)} - \beta_1\overline{X}$$
+$$=\frac{1}{n}\sum{(\beta_0 + \beta_1X_i) - \beta_1\overline{X}}$$
+$$=\frac{1}{n}(n\beta_0 + \beta_1\sum{X_i}) - \beta_1\overline{X} $$
+$$= \beta_0 + \beta_1\overline{X} - \beta_1\overline{X} = \beta_0$$
+
+### Appendix A: R Code
+
+#### A.1: Question 4.a
+
+```{r, message=FALSE, results=FALSE}
+# use tidyverse
+library(tidyverse)
+
+# download data
+dd <- read_table(url(paste("http://users.stat.ufl.edu/~rrandles/sta4210/",
+                           "Rclassnotes/data/textdatasets/KutnerData/", 
+                           "Chapter%20%201%20Data%20Sets/CH01PR19.txt", 
+                           sep="")),
+                 col_names = c("gpa", "act"))
+
+# caculate t-value
+tstar <- qt(1 -.01/2, 120 - 2)
+
+# calculate standard error for b1
+errs <- lm(gpa ~ act, dd)$resid
+sse <- sum(errs^2)
+mse <- sse / (nrow(dd) - 2)
+
+sdb1 <- sqrt(mse/sum((dd$act - mean(dd$act))^2))
+
+0.03883 + tstar*sdb1
+0.03883 - tstar*sdb1
+
+# check with lm
+an1 <- lm(formula = gpa ~ act, data=dd)
+confint(object = an1, level = 0.99)
+```
+
+#### A.2: Question 4.b
+```{r, results=FALSE}
+# calculate t-statistic
+0.03883 / 0.01277
+
+# check with lm
+summary(lm(gpa ~ act, dd))$coefficients
+```
+
+#### A.3: Question 4.c
+
+```{r, results=FALSE}
+# cumulative density function
+2*(1 - pt(3.0472, nrow(dd)-2))
+```
+
+#### A.4: Question 13.a
+```{r, results=FALSE}
+an1 <- lm(gpa ~ act, dd)
+summary(an1)
+
+# standard error of Y hat at h = 28
+yhat_sd <- sqrt(mse * ((1 / nrow(dd) + (28 - mean(dd$act))^2 / sum((dd$act - mean(dd$act))^2))))
+
+# t value
+qt(1-.025, 118)
+
+# standard error of Yhat_new
+yhat_new <- sqrt(mse * (1 + (1 / nrow(dd) + (28 - mean(dd$act))^2 / sum((dd$act - mean(dd$act))^2))))
+```
+
+#### A.5: Question 13.d
+```{r, results = FALSE}
+sqrt(2 * qf(.95, 2, 118)) * 0.0706
+```
+
+#### A.6: Question 23.a
+
+```{r, message=FALSE, results=FALSE}
+ssto <- round(sum((dd$gpa - mean(dd$gpa))^2), 3)
+sse <- round(sum(resid(an1)^2), 3)
+ssr <- ssto - sse
+mse <- round(sse/(nrow(dd) - 2), 3)
+msr <- ssr/1
+frat <- round(msr/mse, 3)
+
+library(tidyverse)
+library(kableExtra)
+library(knitr)
+options(knitr.table.format = "latex")
+
+anova_table <- data.frame(Source=c("Regression", "Error", "Total"), 
+                      SS = c(ssr, sse, ssto), 
+                      df = c(1, nrow(dd) - 2, nrow(dd) - 1),
+                      MS = c(msr, mse, NA), 
+                      "F" = c(frat, NA, NA))
+
+kable(anova_table) %>%
+  kable_styling(latex_options = c("striped"))
+```
+
+#### A.7: Question 23.c
+```{r, results=FALSE}
+qf(1-.01, 1, 118)
+```

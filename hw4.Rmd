@@ -1,0 +1,355 @@
+---
+title: 'STAT 540: Homework 4'
+author: "Tim Farkas"
+date: "11/6/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE)
+library(tidyverse)
+```
+
+### Problem 4.5
+
+```{r}
+ph <- read_table(url(paste("http://users.stat.ufl.edu/~rrandles/sta4210/",                                  "Rclassnotes/data/textdatasets/KutnerData/",
+                           "Chapter%20%201%20Data%20Sets/CH01PR22.txt", 
+                           sep="")),
+                 col_names = c("hard", "time")) %>%
+  mutate(c.time = time - mean(time))
+```
+
+**4.5.a** 
+
+```{r}
+ph %>%
+  lm(hard ~ time, data=.) %>%
+  summary() %>%
+  coefficients() %>%
+  as_tibble() %>%
+  dplyr::rename(beta=1, se=2, tee=3, pval=4) %>%
+  mutate(nparm = nrow(.),
+         tval = qt(1 - .10 / nparm, nrow(ph) - 2),
+         low = beta - tval * se,
+         high = beta + tval * se)
+  
+```
+
+The 90% Bonferroni confidence intervals for $\beta_0$ and $\beta_1$ are:
+
+$$164 < \beta_0 < 173 $$
+$$1.88 < \beta_1 < 2.19$$
+
+This indicates that 90% of such 2-interval sets will capture the true $\beta_0$ and $\beta_1$ constants. Of particular interest is the finding that the interval for $\beta_1$ does not include zero, suggesting (with confidence) that the true $\beta_1$ is not equal to zero, so plastic hardness increases with curing time. That the confidence interval for $\beta_0$ does not include zero is essentially meaningless, because it suggests that hardness is greater than zero at t = 0, but t = 0 is outside the scope of the model. If we choose to extrapolate this linear model to t = 0, the finding does make sense, however, since we expect plastic to have a non-zero hardness even before the curing period begins. It is possible that the fitted value of hardness at t = 0 is correct.
+
+**4.5.b**
+
+Yes, the parameter estimates are negatively correlated, and this can be seen in the much wider interval for $\beta_0$ than for $\beta_1$. Because of the correlation, induced by the (positive) magnitude of $\overline{X}$, a small change in $b_1$ will result in a large change in $b_0$. This can also be seen in the larger standard error for $b_0$ (2.66) than for $b_1$ (0.0904).
+
+**4.5.c**
+
+A family confidence coefficient indicates that 90% of such 2-interval sets will capture the true $\beta_0$ and $\beta_1$ constants.
+
+### Problem 5.5
+
+```{r}
+x <- cbind(rep(1, 6), matrix(c(4, 1, 2, 3, 3, 4)))
+y <- matrix(c(16, 5, 10, 15, 13, 22))
+```
+
+**5.5.1**
+```{r, echo=TRUE, results=TRUE}
+t(y) %*% y
+```
+
+**5.5.2**
+
+```{r, echo=TRUE, results=TRUE}
+t(x) %*% x
+```
+
+
+**5.5.3**
+```{r, echo=TRUE, results=TRUE}
+t(x) %*% y
+```
+
+**5.5.4**
+
+```{r, echo=TRUE, results=TRUE}
+solve(t(x) %*% x)
+```
+
+**5.5.5**
+
+```{r}
+bee <- solve(t(x) %*% x) %*% t(x) %*% y
+bee
+```
+
+**5.5.6**
+
+```{r}
+eee <- y - x %*% bee
+```
+
+**5.5.7**
+
+```{r}
+x %*% solve(t(x) %*% x) %*% t(x)
+```
+
+**5.5.8**
+
+```{r}
+sse <- t(eee) %*% eee
+sse
+```
+
+**5.5.9**
+
+```{r}
+mse <- c(sse / nrow(x))
+s2b <- mse * solve(t(x) %*% x)
+diag(s2b)
+```
+
+**5.5.10**
+
+```{r}
+xh <- matrix(c(1, 2))
+t(xh) %*% s2b %*% xh
+```
+
+### Problem 6.22
+
+**6.22.a** Yes. $X_{i2}^* = log(X_{i2})$ and $X_{i3} = X_{i1}^2$.
+
+**6.22.b** Almost, but no. If you transform $Y^*_i = ln(Y_i)$ and $X_{i2}^* = X_{i2}^2$, then
+
+$$Y^*_i = \beta_0 + \beta_1X_{i1} + \beta_2X_{i2}^* + ln(\epsilon_i)$$
+
+The result has a $ln(\epsilon_i)$, so the model is not linear. 
+
+**6.22.c** No transformation can linearize the model. 
+
+**6.22.d** No transformation can linearize the model. 
+
+**6.22.e** Yes, the transformation$Y^*_i = ln(\frac{1}{Y_i} - 1)$ yields 
+
+$$Y^*_i = \beta_0 + \beta_1X_{i1} + \epsilon_i$$ 
+
+### GPA Problem
+
+```{r}
+gd <- read_table(url(paste("http://users.stat.ufl.edu/~rrandles/",
+                           "sta4210/Rclassnotes/data/textdatasets/KutnerData/",
+                           "Chapter%20%203%20Data%20Sets/CH03PR03.txt", 
+                           sep="")),
+                 col_names = c("gpa", "act", "iq", "rank"))
+```
+
+**a.** This model explaining GPA with IQ, HS rank, and ACT scores assumes that  
+
+1. the relationship between each predictor and GPA is linear in form,
+2. there are no interactions among variables, 
+3. the errors are normally distributed, and
+4. the errors have equal variance across fitted values and values of predictors.
+
+**b.** Plots of GPA against each of the predictors will show whether the assumption of linearity is appropriate. 
+
+```{r, results=TRUE}
+an1 <- lm(gpa ~ act + iq + rank, data=gd)
+
+gd %>% 
+  gather(key="predictor", value="value", act, iq, rank) %>%
+  ggplot(aes(x=value, y=gpa)) + 
+  geom_point() + 
+  facet_wrap(~ predictor, scales="free")
+```
+
+These plots do not show any clear non-linearities. 
+
+**c.**
+
+```{r}
+qqnorm(resid(an1))
+```
+
+Wow, looks really good! All the residuals fall quite close the theoretical normal. 
+
+**d.**
+
+```{r}
+gd %>%
+  mutate(fit = fitted(an1),
+         err = resid(an1)) %>%
+  gather(key="predictor", value="value", act, iq, rank, fit) %>%
+  ggplot(aes(y=err, x=value)) +
+  geom_point() +
+  facet_wrap( ~ predictor, scales="free")
+```
+
+Error appears relatively stable over the range of ACT scores and HS ranks, but there are clear (very similar) patterns for IQ and the fitted values, with higher variance toward the mean, and lower variance toward the extremes.
+
+**e.**
+
+
+```{r}
+gd %>%
+  mutate(fit = fitted(an1),
+         err = resid(an1)) %>%
+  ggplot() +
+  geom_histogram(aes(x=err))
+```
+
+Based on this histogram of the residuals, there do not appear to be any outliers. 
+
+```{r}
+gd %>%
+  gather(key="predictor", value="value", iq, rank, act) %>%
+  ggplot(aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~ predictor, scales="free")
+
+```
+
+There appears to be one potential outlier -- a student with a particularly low IQ of less than 80. It is possible for this outlier not to lead to a clear signal in the residuals if the GPA for this student is actually well predicted by the model, given the extremely low IQ, which appears to be the case, as shown in the figure below. This is to say, the low IQ actually may not be an outlier, in the sense of being drawn from a different population than the other values. 
+
+```{r}
+gd %>%
+  ggplot(aes(x=iq, y=gpa)) + 
+  geom_point()
+```
+
+**f.**
+
+```{r}
+gd %>%
+  lm(gpa ~ act + iq + rank, data=.) %>%
+  summary()
+```
+
+Given the full, first-order model explaining GPA, test of the hypotheses that the parameter coefficients for each predictor (ACT, IQ, and HS Rank) equal 0 show that neither ACT nor HS GPA are significant predictors at $\alpha = 0.05$ ($P_{ACT} = 0.869; P_{Rank} = 0.152$), but that IQ is a significant predictor (P < 0.0001). I conclude that IQ is an important factor in determining student success, but that ACT scores and HS Rank are not, when accounting for the influence of IQ. 
+
+**g.** No, they are clearly related, but there is not evidence that ACT scores do not measure anything related to college success that is not measured by an IQ. On the contrary, this does indicate that IQ scores do indicate something related to college success (GPA) that is not measured by the ACT scores. 
+
+**h.** $R^2 = 0.644$, indicating that 64.4% of variation in GPA scores among students can be explained by ACT scores, IQ, and HS rank. This is a reasonably high number (I am an ecologist by training -- this would be a very high $R^2$ in nature!!) though it indicates that there is a fair amount of variation in student success not accounted for. Even the combination of these three metrics does not explain much. 
+
+**i.**
+
+```{r}
+x <- matrix(c(rep(1, nrow(gd)), gd$act, gd$iq, gd$rank), nrow=nrow(gd))
+y <- matrix(gd$gpa)
+bees <- solve(t(x) %*% x) %*% t(x) %*% y
+fit <- x %*% bees
+err <- y - fit
+mse <- c((t(err) %*% err) / (nrow(gd) - 2))
+varb <- solve(t(x) %*% x) * mse
+
+xh <- matrix(c(1, 32, 82, 72))
+
+yhath <- c(t(xh) %*% bees)
+varyhath <- c(t(xh) %*% varb %*% xh)
+
+plusminus <- qt(1 - .05/2, nrow(gd) - nrow(xh)) * sqrt(varyhath)
+low <- yhath - plusminus
+high <- yhath + plusminus
+```
+
+The 95% confidence interval for fitted value at ACT = 32, IQ = 82, HS Rank = 72 is:
+
+$$1.33 < E\{Y_h\} < 1.89$$
+This suggests that 95% of confidence intervals constructed in this way will capture the true mean of GPAs for students with ACT scores of 32, IQs of 82, and HS Rank of 72, offering confidence that the mean in the range between 1.33 and 1.89.
+
+**j.**
+
+```{r}
+varpred <- mse * (1 + t(xh) %*% solve(t(x) %*% x) %*% xh)
+plusminuspred <- qt(1 - 0.05/2, nrow(gd) - nrow(xh)) * sqrt(varpred)
+
+lowpred <- yhath - plusminuspred
+highpred <- yhath + plusminuspred
+```
+
+The 95% confidence interval for prediction of new observation at ACt of 32, IQ of 82, and HS Rank of 72 is:
+
+$$0.79 < Y_{h(new)} < 2.43$$
+This suggests that 95% of confidence intervals constructed in this way will capture the GPA of any new student with ACT scores of 32, IQs of 82, and HS Rank of 72, offering confidence that new students with values of these predictors will have GPAs betwen 0.79 and 2.43. This interval is wider than for the mean (above) because of the additional random variation in GPA scores for individuals observations. 
+
+**k.**
+
+```{r}
+cor(x[, 2:4])
+```
+
+The correlation among predictors is between 0.3 and 0.46 for all pairs. These are relatively modest correlations, and should not pose problems for analysis. 
+
+**l.**
+
+```{r}
+summary(lm(gpa ~ act, data=gd))
+summary(lm(gpa ~ iq + act, data=gd))
+```
+
+$b_2$ is an order of magnitude lower in the multiple regression model, and becomes statistically insignificant at $\alpha = 0.05$. This is due to the correlation between ACT scores and IQ -- ACT scores do not explain variation in GPA over and above that explained by IQ, but variation in IQ _does_ explain variation over and above that explained by ACT. 
+
+**m.**
+
+```{r}
+
+anova(lm(gpa ~ iq + act + rank, data=gd))
+anova(lm(gpa ~ act + iq + rank, data=gd)) # interesting!
+
+ssto <- t(y) %*% y - (1/nrow(gd)) * 
+  t(y) %*% matrix(1, nrow=nrow(gd), ncol=nrow(gd)) %*% y # 49.40545
+
+# model 1
+x1 <- x[, c(1, 3)]
+b1 <- solve(t(x1) %*% x1) %*% t(x1) %*% y
+yhat1 <- x1 %*% b1
+err1 <- y - yhat1
+sse1 <- t(y) %*% y - t(b1) %*% t(x1) %*% y
+ssr1 <- ssto - sse1 # 17.935
+
+# model 2
+x2 <- x[, c(1, 3, 2)]
+b2 <- solve(t(x2) %*% x2) %*% t(x2) %*% y
+yhat2 <- x2 %*% b2
+err2 <- y - yhat2
+sse2 <- t(y) %*% y - t(b2) %*% t(x2) %*% y
+ssr2 <- ssto - sse2
+
+
+# model 3
+x3 <- x[, c(1, 3, 2, 4)]
+b3 <- solve(t(x3) %*% x3) %*% t(x3) %*% y
+yhat3 <- x3 %*% b3
+err3 <- y - yhat3
+sse3 <- t(y) %*% y - t(b3) %*% t(x3) %*% y
+ssr3 <- ssto - sse3
+
+ssr2g1 <- sse1 - sse2 # 0.028
+ssr3g12 <- sse2 - sse3 # 0.315
+r2x1x2 <- ssr2 / ssto # 0.6375
+r22g1 <- (sse1 - sse2) / sse1 # 0.00156
+
+```
+
+$$SSR(X_1) = 31.47$$
+
+$$SSR(X_2 | X_1) = 0.280$$
+$$SSR(X_3 | X_1, X_2) = 0.325$$
+$$R^2(X_2, X_1) = 0.6375$$
+
+$$R^2_{Y,2|1} = 0.00156$$
+
+The multiple $R^2$ for model 2 of 0.6375 indicates that ACT Scores and IQ together explain 63.75% of variation in GPAs, but the partial $R^2_{Y,2|1}$ of 0.00156 indicates that only 0.156% of this variation is due to adding ACT scores to a model that already includes IQ.
+
+
+
+
+

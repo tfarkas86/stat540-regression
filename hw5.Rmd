@@ -1,0 +1,295 @@
+---
+title: 'STAT 540: Homework 5'
+author: "Tim Farkas"
+date: "11/21/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, results = FALSE)
+library(tidyverse)
+```
+
+
+### Problem 8.4 
+
+```{r}
+md <- read_table(url(paste("http://users.stat.ufl.edu/~rrandles/", 
+                           "sta4210/Rclassnotes/data/textdatasets/KutnerData/", 
+                           "Chapter%20%201%20Data%20Sets/CH01PR27.txt", 
+                           sep="")),
+                 col_names = c("age", "mass")) %>%
+  mutate(age2 = age^2, 
+         c.age = age - mean(age),
+         c.age2 = c.age^2,
+         int = 1)
+```
+
+#### 8.4.a  
+
+```{r, results=TRUE}
+
+# fit model
+mod1 <- lm(mass ~ c.age + c.age2, data = md)
+summary(mod1)
+
+# get fitted values
+fit1 <- fitted(mod1)
+
+# plot data and fitted values
+
+md %>%
+  ggplot() +
+  geom_point(aes(x=c.age, y=mass)) +
+  geom_line(aes(x=c.age, y=fit1))
+
+```
+
+The fitted quadratic regression model with centered a centered predictor for age is :  
+
+$$ Y = 60.56 - 0.628(AGE) - 0.00224(AGE^2) $$
+The $R^2$ = 0.753. Coupled with the plot of the data and fitted regression function, we see that this function is a very good fit for the data.
+
+#### 8.4.b  
+
+```{r}
+qf(.95, 2, 57)
+```
+
+$$H_0: \beta_1 = \beta_2 = 0$$
+$$ H_{\alpha}: otherwise$$
+
+The decision rule is:
+
+$$ F^* > F_{2, 57}(1 - \alpha = 0.05) = 3.15 $$
+Because
+
+$$F^* = 86.92 > F_{2, 57}(1 - \alpha = 0.05) = 3.15$$
+We reject the null hypothesis at $\alpha = 0.05$ and conclude that there is a regression relation.
+
+#### 8.4.c  
+
+h = 48 years
+
+```{r}
+exx <- as.matrix(md %>% dplyr::select(int, c.age, c.age2))
+xh = matrix(c(1, 48 - mean(md$age), (48 - mean(md$age))^2))
+bee = matrix(mod1$coefficients)
+
+yhath <- t(xh) %*% bee # 80.72
+ees <- matrix(resid(mod1))
+sse <- c(t(ees) %*% ees)
+mse <- c(sse / (nrow(md) - nrow(bee)))
+
+varb <- solve(t(exx) %*% exx) * mse
+varyhath <- t(xh) %*% varb %*% xh # 13.19
+
+plusminus <- varyhath * qt(1 - 0.05/2, 57)
+
+low <- yhath - plusminus # 54.302
+high <- yhath + plusminus # 107.1363
+
+```
+
+The estimated mean muscle mass for a 48 year old woman is 80.72. The 95% confidence interval for the mean is:  
+
+
+$$54.302 < E(Y_h) < 107.136$$  
+
+
+which indicates confidence that mean muscle mass for 48 year old women is between 54 and 107. However, 48 years is a bit outside the scope of the model, so this interpretation needs to be made with caution, especially because the regression function is a polynomial, and may take extreme values for even small deviations from the scope. However, this does not appear to be the case, given the figure shown above.
+
+#### 8.4.d  
+
+```{r}
+varpred <- mse + varyhath
+pmpred <- varpred * qt(1 - 0.05/2, 57)
+
+low <- yhath - pmpred # -16.92527
+high <- yhath + pmpred # 178.3635
+
+```
+
+The predicted muscle mass for a 48 year-old woman is the same as the predicted mean muscle mass above (80.72), but the 95% confidence intervals are much wider:
+
+$$-16.93 < Y_{h(new)} < 178.36$$  
+Although statistically correct, this interval useless, since it violates some important assumptions about muscle mass that are not modelled here, namely that it cannot be less than zero. We know the interval for muscle mass of 48 year old women must be narrower, so the statistical approach shown here is not viable, at least not for prediction toward the extremes of the model scope.
+
+#### 8.4.e  
+
+```{r}
+summary(mod1)
+qt(1 - 0.05/2, 58) # 2.0017
+```
+
+$$H_0: \beta_2 = 0$$
+$$ H_{\alpha}: \beta_2 \ne 0$$
+The decision rule is:
+
+$$ |t^*| > t_{58}(1 - \alpha = 0.05) = 2.00 $$
+
+Because 
+
+$$ |t^*| = 0.83 < t_{58}(1 - \alpha = 0.05) = 2.00 $$
+
+We fail to reject the null hypothesis of a first order polynomial model. 
+
+#### 8.4.f  
+
+```{r}
+b0 <- bee[1, ] - bee[2, ] * mean(md$age) + bee[3, ] * mean(md$age2)
+b1 <- bee[2, ] - 2 * bee[3, ] * mean(md$age)
+b2 <- bee[3, ]
+```
+
+The regression function in original scale is:
+
+$$Y = 97.19 - 0.248(AGE) - 0.00223(AGE^2)$$
+
+#### 8.4.g
+
+```{r}
+cor(md$age, md$age2) # 0.995
+cor(md$c.age, md$c.age2) # 0.0576
+```
+
+$$\rho_{X, X^2} = 0.995$$
+$$\rho_{x, x^2} = 0.058$$
+Official answer: Yes, the correlation between raw age variables is extremely high, whereas it is very low for centered age and its square. 
+
+**However**, I contend that there really is no problem with the model using raw variables. See below that the residual standard error is the same for a model with centered variables (35.57), as is the standard error for the quadratic term. We see that the standard error for the "linear term" is one order of magnitude higher when using raw age, but this makes sense even without invoking the menacing effects of multicollinearity, since the parameter estimate here is for the slope of the regression function when age = 0. An age of 0 is well outside the scope of the model, and so we can expect the standard error for the slope here to be much higher than for the mean age. 
+
+```{r}
+mod2 <- lm(mass ~ age + age2, data=md)
+summary(mod2)
+summary(mod1)
+```
+
+### Problem 8.40  
+
+```{r}
+sd <- read_table(url(paste("http://users.stat.ufl.edu/~rrandles/sta4210/",     
+                           "Rclassnotes/data/textdatasets/KutnerData/", 
+                           "Appendix%20C%20Data%20Sets/APPENC01.txt", 
+                           sep="")),
+                 col_names = c("id", "stay", "age", "risk", "culture", "xray",
+                               "beds", "sch", "region", "census", 
+                               "nurses", "facs")) %>%
+  dplyr::mutate(sch = ifelse(sch == 1, 1, 0),
+                reg_ne = ifelse(region==1, 1, 0),
+                reg_nc = ifelse(region==2, 1, 0), 
+                reg_s = ifelse(region==3, 1, 0))
+
+
+  
+```
+
+#### 8.40.a  
+
+```{r}
+mod3 <- lm(risk ~ stay + age + xray + sch, data=sd)
+summary(mod3)
+```
+
+The fitted first-order regression model function is:
+
+$$RISK = 0.857 + 0.289(STAY) - 0.018(AGE) + 0.020(XRAY) + 0.288(SCHOOL)$$
+
+#### 8.40.b  
+
+```{r}
+tval <- qt(1 - 0.02/2, nrow(sd) - 5) # 2.361
+pm <- 0.30668 * tval
+low = 0.28782 - pm # -0.436
+high = 0.28782 + pm # 1.012
+```
+
+From output of linear models above, the estimated difference in risk between cases associated with a medical school and those not associated is $b_{sch} = 0.28782$, and $s\{b_{sch}\} = 0.30668$, hence 98% confidence intervals for the effect are:
+
+$$-0.436 < \beta_{sch} < 1.012$$
+Therefor we fail to reject the hypothesis that $\beta_{sch}$ is equal to zero at $\alpha = 0.02$.
+
+#### 8.40.c  
+
+```{r}
+mod4 <- lm(risk ~ stay + age + xray + sch + sch*age + sch*xray, data=sd)
+summary(mod4)
+
+qt(.95, 106) # 1.6594
+```
+
+$$H_{01}: \beta_{sch*age} = 0, H_{02} = \beta_{sch*xray} = 0$$
+$$H_{\alpha1}: \beta_{sch*age} \ne 0, H_{\alpha2}: \beta_{sch*xray} \ne 0$$
+For both interaction terms, we reject the null hypothesis if: 
+
+$$|t^*_{int}| > t_{106}(0.95) = 1.6594$$
+In both cases, the absolute value of the t-statistic exceeds 1.6594, hence we reject the null hypotheses and conclude that the interactions are important. 
+
+### Problem 8.41  
+
+#### 8.41.a  
+
+```{r}
+mod5 <- lm(stay ~ age + culture + census + facs + reg_ne + reg_nc + reg_s, 
+           data=sd)
+summary(mod5)
+```
+
+The fitted regression function is: 
+
+$$STAY = 0.10(AGE) + 0.04(CRAT) + 0.0066(CENSUS) - 0.02(FACS) + 2.14(NE) + 1.19(NC) + 0.63(S) $$
+
+```{r, include=FALSE}
+
+qt(1 - 0.05/2, nrow(sd) - 8) # 1.9828
+```
+
+$$H_0: \beta_{crat} = 0$$
+$$H_{\alpha}: \beta_{crat} \ne 0$$
+Decision rule: 
+
+$$|t^*_{crat}| > t_{105}(0.975) = 1.9828$$
+
+The t-statistic for culture ratio is $t^* = 2.818$, 
+
+hence we reject the null hypothesis and conclude that culture ratio has an influence on the length of hospital stay. 
+
+#### 8.41.c  
+
+For all region comparisons, the hypotheses are:
+$$H_0: \beta_k = 0$$
+$$H_{\alpha}: \beta_k \ne 0$$
+Bonferroni Decision Rule: 
+
+$$|t^*_k| > t_{105}(1 - \frac{0.05}{3*2}) = 2.433$$
+
+```{r}
+qt(1 - 0.05/6, 105) # 2.433
+```
+
+$|t^*_k|$ exceeds 2.433 for the NE and NC regions ($t^*_{NE} = 4.66, t^*_{NC} = 2.724$), but not for the S region ($t^*_S = 1.482$), hence we conclude that the length of stay differs between W and both NC and NE, but not between W and S.  
+
+### Prove Thm 8.12:
+
+$$\hat{Y} = b'_0 + b'_1X + b'_{11}X^2 = b_0 + b'_1x + b'_{11}x^2$$
+
+where 
+
+$$x = X - \overline{X}$$
+
+$$b'_0 = b_0 - b_1\overline{X} + b_{11}\overline{X}^2$$
+$$b'1 = b_1 - 2b_{11}\overline{X}$$
+$$b'_{11} = b_{11}$$
+
+**Proof**
+
+$$\hat{Y} = [b_0 - b_1\overline{X} + b_{11}\overline{X}^2] + [b_1 - 2b_{11}\overline{X}]X + [b_{11}]X^2  $$
+$$\hat{Y} = b_0 - b_1\overline{X} + b_1X + b_{11}\overline{X}^2 - 2b_{11}X\overline{X} = b_{11}X^2$$
+
+$$\hat{Y} = b_0 + b_1(X - \overline{X}) + b_{11}(X^2 - 2X\overline{X} + \overline{X}^2) $$
+
+$$\hat{Y} = b_0 + b_1(X - \overline{X}) + b_{11}(X - \overline{X})^2 $$
+$$\hat{Y} = b_0 + b_1x + b_{11}x^2$$
+
+
+
